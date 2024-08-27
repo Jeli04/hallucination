@@ -25,12 +25,30 @@ def load_data(file_path, type='json'):
 
 def create_vocab(data, keys=['right_answer']):
     vocab = {}
-    for entry in data:
-        for key in keys:
-            words = nltk.word_tokenize(entry.get(key))  # Tokenize the text into words
-            for word in words:
-                if word not in vocab:
-                    vocab[word] = len(vocab)  # Assign a unique ID
+
+    if "Correct Answers" in keys or "Incorrect Answers" in keys:
+        for i, entry in data.iterrows():
+            for key in keys:
+                answer_list = entry[key].split(';')
+                words = nltk.word_tokenize(answer_list[0])  # only gets the first
+                for word in words:
+                    if word not in vocab:
+                        vocab[word] = len(vocab)  # Assign a unique ID
+    else:
+        for entry in data:
+            for key in keys:
+                words = nltk.word_tokenize(entry.get(key))
+                for word in words:
+                    if word not in vocab:
+                        vocab[word] = len(vocab)  # Assign a unique ID
+    return vocab
+
+def create_vocab2(text1, text2):
+    vocab = {}
+    word_list = nltk.word_tokenize(text1) + nltk.word_tokenize(text2)
+    for word in word_list:
+        if word not in vocab:
+            vocab[word] = len(vocab)
     return vocab
 
 
@@ -101,7 +119,10 @@ if __name__ == '__main__':
     # Load the data
     data = load_data('data/qa_data.json')
 
-    svd_setting = "col"
+    file_path = 'data/TruthfulQA.csv'
+    data = pd.read_csv(file_path)
+
+    svd_setting = "row"
     ngram = 2
     cosine_similarities = []
     procrustes_distances = []
@@ -110,20 +131,33 @@ if __name__ == '__main__':
     modified_data = []
 
     # Create the tokenized vocabulary
-    right_vocab = create_vocab(data, keys=['right_answer'])
-    halu_vocab = create_vocab(data, keys=['hallucinated_answer'])
+    # right_vocab = create_vocab(data, keys=['right_answer'])
+    # halu_vocab = create_vocab(data, keys=['hallucinated_answer'])
+    right_vocab = create_vocab(data, keys=['Correct Answers'])
+    halu_vocab = create_vocab(data, keys=['Incorrect Answers'])
 
     # Union the vocabularies
     vocab = {**right_vocab, **halu_vocab}
 
     # Intersect the vocabularies
     # vocab = create_vocab(data, keys=['right_answer', 'hallucinated_answer'])
+    # vocab = create_vocab(data, keys=['Correct Answers', 'Incorrect Answers'])
 
     # Add a progress bar to the loop
-    for i, entry in tqdm(enumerate(data), total=len(data), desc="Processing Entries"):
-        question_grams = generate_word_ngrams(entry['question'], ngram)
-        right_grams = generate_word_ngrams(entry['right_answer'], ngram)
-        hallucinated_grams = generate_word_ngrams(entry['hallucinated_answer'], ngram)
+    # for i, entry in tqdm(enumerate(data), total=len(data), desc="Processing Entries"):
+    for i, (index, entry) in tqdm(enumerate(data.iterrows()), total=len(data), desc="Processing Entries"):
+        # question_grams = generate_word_ngrams(entry['question'], ngram)
+        # right_grams = generate_word_ngrams(entry['right_answer'], ngram)
+        # hallucinated_grams = generate_word_ngrams(entry['hallucinated_answer'], ngram)
+        correct_answers_list = entry['Correct Answers'].split(';')[0]
+        incorrect_answers_list = entry['Incorrect Answers'].split(';')[0]
+
+        # union the input vocabularies
+        # input_vocab = create_vocab2(correct_answers_list, incorrect_answers_list)
+
+        question_grams = generate_word_ngrams(entry['Question'], ngram)
+        right_grams = generate_word_ngrams(correct_answers_list, ngram)
+        hallucinated_grams = generate_word_ngrams(incorrect_answers_list, ngram)
 
         # Prepare the input for SVD
         right_input = prepare_svd_input(right_grams, vocab, ngram).to(device)
@@ -149,7 +183,8 @@ if __name__ == '__main__':
         # cka_scores.append(cka_score)
 
         # Calculate the Rouge-N score between the right and hallucinated answers
-        rouge_scores.append(calculate_rouge_n(entry['right_answer'], entry['hallucinated_answer'], ngram))
+        # rouge_scores.append(calculate_rouge_n(entry['right_answer'], entry['hallucinated_answer'], ngram))
+        rouge_scores.append(calculate_rouge_n(entry['Correct Answers'], entry['Incorrect Answers'], ngram))
 
         # Store modified data in the new variable
         modified_entry = {
