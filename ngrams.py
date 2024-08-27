@@ -153,6 +153,7 @@ vocab['<PAD>'] = 0
 file_path = 'data/TruthfulQA.csv'
 data = pd.read_csv(file_path)
 
+# create the ngrams
 if dataset == "halueval":
     for i, entry in enumerate(data):
         right_answers.append(entry.get("right_answer"))
@@ -172,33 +173,14 @@ if dataset == "truthfulqa":
         # Generate n-grams for the question
         question_ngram = generate_word_ngrams(row['Question'], ngram)
         
-        if metric_setting == "correct-incorrect":
-            # Pair each correct answer with each incorrect answer
-            for correct_answer in correct_answers_list[:1]:
-                for incorrect_answer in incorrect_answers_list[:1]:
-                    right_answers.append(correct_answer)
-                    hallucinated_answers.append(incorrect_answer)
-                    question_grams.append(question_ngram)
-                    right_answer_grams.append(generate_word_ngrams(correct_answer, ngram))
-                    hallucinated_answer_grams.append(generate_word_ngrams(incorrect_answer, ngram))
-        elif metric_setting == "correct-correct":
-            # Pair each correct answer with another correct answer
-            for i in range(len(correct_answers_list)):
-                for j in range(i + 1, len(correct_answers_list)):
-                    right_answers.append(correct_answers_list[i])
-                    hallucinated_answers.append(correct_answers_list[j])
-                    question_grams.append(question_ngram)
-                    right_answer_grams.append(generate_word_ngrams(correct_answers_list[i], ngram))
-                    hallucinated_answer_grams.append(generate_word_ngrams(correct_answers_list[j], ngram))
-        elif metric_setting == "incorrect-incorrect":
-            # Pair each incorrect answer with another incorrect answer
-            for i in range(len(incorrect_answers_list)):
-                for j in range(i + 1, len(incorrect_answers_list)):
-                    right_answers.append(incorrect_answers_list[i])
-                    hallucinated_answers.append(incorrect_answers_list[j])
-                    question_grams.append(question_ngram)
-                    right_answer_grams.append(generate_word_ngrams(incorrect_answers_list[i], ngram))
-                    hallucinated_answer_grams.append(generate_word_ngrams(incorrect_answers_list[j], ngram))
+        # Pair each correct answer with each incorrect answer
+        for correct_answer in correct_answers_list[:1]:
+            for incorrect_answer in incorrect_answers_list[:1]:
+                right_answers.append(correct_answer)
+                hallucinated_answers.append(incorrect_answer)
+                question_grams.append(question_ngram)
+                right_answer_grams.append(generate_word_ngrams(correct_answer, ngram))
+                hallucinated_answer_grams.append(generate_word_ngrams(incorrect_answer, ngram))
 
 cosine_similarities = []
 procrustes_distances = []
@@ -210,9 +192,6 @@ modified_data = []
 for i in range(len(question_grams)):
     # Pad grams to the same size before SVD
     if metric_setting == "correct-incorrect":
-        output = pad_grams([hallucinated_answer_grams[i], right_answer_grams[i]], ngram)
-        hallucinated_answer_grams[i], right_answer_grams[i] = output[0], output[1]
-    elif metric_setting == "correct-correct":
         output = pad_grams([hallucinated_answer_grams[i], right_answer_grams[i]], ngram)
         hallucinated_answer_grams[i], right_answer_grams[i] = output[0], output[1]
 
@@ -228,11 +207,6 @@ for i in range(len(question_grams)):
         Xg = U
     elif svd_setting == "column":
         Xg = torch.mm(U, torch.diag(S))
-
-    if metric_setting == "incorrect-incorrect":
-
-
-    if metric_setting == "correct-correct":
 
 
     # print(Xo.shape, Xg.shape)

@@ -81,7 +81,7 @@ for entry in data:
     cosine.append((entry['cosine'] + 1) / 2)
     procrustes.append(entry['procrustes'])   
     rouge_scores.append(entry['rouge'][-1])
-    cka.append(entry['cka'])
+    # cka.append(entry['cka'])
 
 
 # No ROUGE Scores
@@ -104,5 +104,7 @@ plot_data(procrustes, cosine, "Procrustes Distance", "Cosine Similarity", "Procr
 # plot_data(procrustes, cka, "Procrustes Distance", "CKA", "Procrustes Distance vs. CKA Between Hallucinations and Non-Hallucinations (2 Grams)")
 # plot_data(cka, cosine, "CKA", "Cosine Similarity", "CKA vs. Cosine Similarity Between Hallucinations and Non-Hallucinations (2 Grams)")
 
-plot_multi_data([cosine, procrustes], rouge_scores, ["cosine", "procurstes"], "Metric", "Rouge F1", "Cosine Similarity & Procrustes vs. ROUGE-2 Score")
+plot_multi_data([cosine], rouge_scores, ["cosine"], "Metric", "Rouge F1", "Cosine Similarity vs. ROUGE-2 Score")
+plot_multi_data([procrustes], rouge_scores, ["procurstes"], "Metric", "Rouge F1", "Procrustes vs. ROUGE-2 Score")
+# plot_multi_data([cosine, procrustes], rouge_scores, ["cosine", "procurstes"], "Metric", "Rouge F1", "Cosine Similarity & Procrustes vs. ROUGE-2 Score")
 # plot_multi_data([cosine, procrustes, cka], rouge_scores, ["cosine", "procrustes", "cka"], "Metric", "Rouge F1", "Cosine Similarity & Procrustes & CKA vs. ROUGE-2 Score")
