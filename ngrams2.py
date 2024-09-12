@@ -9,6 +9,8 @@ from nltk.tokenize import word_tokenize
 from scipy.spatial import procrustes
 from rouge_score import rouge_scorer
 from typing import Tuple
+from matplotlib import pyplot as plt
+import heapq
 
 # Ensure you have the required data files
 nltk.download('punkt')
@@ -65,7 +67,7 @@ def prepare_svd_input(grams, vocab, ngram):
         for gram in grams:
             hash_map[vocab[gram[i]]] += 1
         input.append(hash_map)
-    return torch.tensor(input, dtype=torch.float).T  # A tensor of shape (len(vocab), ngram)
+    return torch.tensor(input, dtype=torch.float).T # A tensor of shape (len(vocab), ngram)
 
 
 def compute_procrustes_distances(tensor1, tensor2):
@@ -124,11 +126,14 @@ if __name__ == '__main__':
 
     svd_setting = "row"
     ngram = 2
+    k = 2 # low rank approximation
     cosine_similarities = []
     procrustes_distances = []
     cka_scores = []
     rouge_scores = []
     modified_data = []
+    xos = []
+    xgs = []
 
     # Create the tokenized vocabulary
     # right_vocab = create_vocab(data, keys=['right_answer'])
@@ -152,6 +157,7 @@ if __name__ == '__main__':
         correct_answers_list = entry['Correct Answers'].split(';')[0]
         incorrect_answers_list = entry['Incorrect Answers'].split(';')[0]
 
+
         # union the input vocabularies
         # input_vocab = create_vocab2(correct_answers_list, incorrect_answers_list)
 
@@ -163,12 +169,37 @@ if __name__ == '__main__':
         right_input = prepare_svd_input(right_grams, vocab, ngram).to(device)
         halu_input = prepare_svd_input(hallucinated_grams, vocab, ngram).to(device)
 
-        # Perform SVD
-        U, S, V = torch.svd(right_input)
-        Xo = U if svd_setting == "row" else torch.mm(U, torch.diag(S))
+        # print(right_input.shape, halu_input.shape)
 
-        U, S, V = torch.svd(halu_input)
-        Xg = U if svd_setting == "row" else torch.mm(U, torch.diag(S))
+        # Perform SVD and low rank approximation
+        U, S, V = torch.linalg.svd(right_input, full_matrices=True)
+        # print(U.shape, S.shape, V.shape)
+        U = U[:, :k]
+        S = S[:k]
+        V = V[:, :k]
+        if svd_setting == "row":
+            Xo = torch.mm(U, torch.diag(S))
+        elif svd_setting == "col":
+            Xo = V
+        xos.append(Xo)
+        # print(S.shape)
+        # plt.semilogy(S.cpu()/S[0].cpu())
+        # plt.ylabel(r"$\sigma_i / \sigma_0$", fontsize=24)
+        # plt.xlabel(r"Singular value index, $i$", fontsize=24)
+        # plt.grid(True)
+        # plt.xticks(fontsize=26)
+        # plt.yticks(fontsize=26)
+        # plt.show()
+
+        U, S, V = torch.linalg.svd(halu_input, full_matrices=True)
+        U = U[:, :k]
+        S = S[:k]
+        V = V[:, :k]
+        if svd_setting == "row":
+            Xg = torch.mm(U, torch.diag(S))
+        elif svd_setting == "col":
+            Xg = V
+        xgs.append(Xg)
 
         # Compute the cosine similarity between the two matrices
         cosine_similarity = torch.nn.functional.cosine_similarity(Xo, Xg, dim=1)
@@ -203,11 +234,13 @@ if __name__ == '__main__':
     print("Min Cosine Similarity:", np.min(cosine_similarities))
     print("Max Cosine Similarity:", np.max(cosine_similarities))
     print("Standard Deviation of Cosine Similarity:", np.std(cosine_similarities))
+    print("Variation of Cosine Similarity:", np.var(cosine_similarities))
     print("-" * 50)
     print("Average Procrustes Distance:", np.mean(procrustes_distances))
     print("Min Procrustes Distance:", np.min(procrustes_distances))
     print("Max Procrustes Distance:", np.max(procrustes_distances))
     print("Standard Deviation of Procrustes Distance:", np.std(procrustes_distances))
+    print("Variation of Procrustes Distance:", np.var(procrustes_distances))
     # print("-" * 50)
     # print("Average CKA Score:", np.mean(cka_scores))
     # print("Min CKA Score:", np.min(cka_scores))
@@ -218,9 +251,19 @@ if __name__ == '__main__':
     print("Min Rouge Score:", np.min(rouge_scores))
     print("Max Rouge Score:", np.max(rouge_scores))
     print("Standard Deviation of Rouge Score:", np.std(rouge_scores))
+    print("Variation of Rouge Score:", np.var(rouge_scores))
     print("-" * 50)
 
     # Write the modified data to a new JSON file
     with open('modified_data.json', 'w') as f:
         json.dump(modified_data, f, indent=4, default=convert_to_serializable)
 
+    # Get the indices of the 50 largest values
+    max_indices = heapq.nlargest(50, range(len(rouge_scores)), key=rouge_scores.__getitem__)
+
+    # Get the indices of the 50 smallest values
+    min_indices = heapq.nsmallest(50, range(len(rouge_scores)), key=rouge_scores.__getitem__)
+
+    for i in range(50):
+        print("Cosine Similarity Max:", torch.nn.functional.cosine_similarity(torch.mean(xos[max_indices[i]], xgs[max_indices[i]], dim=1)))
+        print("Cosine Similarity Min:", torch.nn.functional.cosine_similarity(torch.mean(xos[min_indices[i]], xgs[min_indices[i]], dim=1)))
