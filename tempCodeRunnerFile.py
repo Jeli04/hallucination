@@ -1,1 +1,0 @@
-    plt.hist(hallucinated_real_distances, bins=bins, alpha=0.7, label="Hallucinated-Real Text", color='green', weights=np.ones_like(hallucinated_real_distances) * 100. / len(hallucinated_real_distances))
