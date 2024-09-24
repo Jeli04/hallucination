@@ -67,13 +67,15 @@ def prepare_svd_input(grams, vocab, ngram):
         for gram in grams:
             hash_map[vocab[gram[i]]] += 1
         input.append(hash_map)
-    return torch.tensor(input, dtype=torch.float).T # A tensor of shape (len(vocab), ngram)
+    return torch.tensor(input, dtype=torch.float) # A tensor of shape (len(vocab), ngram)
 
 
 def compute_procrustes_distances(tensor1, tensor2):
     try:
         if tensor1.size(0) == 1 and tensor2.size(0) == 1:
             return 0.0
+        print(tensor1.shape, tensor2.shape)
+        exit()
         _, _, disparity = procrustes(tensor1.cpu().numpy(), tensor2.cpu().numpy())
         return disparity
     except ValueError as e:
@@ -124,7 +126,7 @@ if __name__ == '__main__':
     file_path = 'data/TruthfulQA.csv'
     data = pd.read_csv(file_path)
 
-    svd_setting = "row"
+    svd_setting = "col"
     ngram = 2
     k = 2 # low rank approximation
     cosine_similarities = []
@@ -215,7 +217,7 @@ if __name__ == '__main__':
 
         # Calculate the Rouge-N score between the right and hallucinated answers
         # rouge_scores.append(calculate_rouge_n(entry['right_answer'], entry['hallucinated_answer'], ngram))
-        rouge_scores.append(calculate_rouge_n(entry['Correct Answers'], entry['Incorrect Answers'], ngram))
+        rouge_scores.append(calculate_rouge_n(entry['Correct Answers'].split(';')[0], entry['Incorrect Answers'].split(';')[0], ngram))
 
         # Store modified data in the new variable
         modified_entry = {
@@ -239,6 +241,7 @@ if __name__ == '__main__':
     print("Average Procrustes Distance:", np.mean(procrustes_distances))
     print("Min Procrustes Distance:", np.min(procrustes_distances))
     print("Max Procrustes Distance:", np.max(procrustes_distances))
+    print("Mean Procrustes Distance:", np.mean(procrustes_distances))
     print("Standard Deviation of Procrustes Distance:", np.std(procrustes_distances))
     print("Variation of Procrustes Distance:", np.var(procrustes_distances))
     # print("-" * 50)
